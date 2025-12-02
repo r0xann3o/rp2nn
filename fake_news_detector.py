@@ -237,15 +237,15 @@ def main():
     X_train_padded, tokenizer = tokenize_and_pad(X_train, fit=True)
     X_val_padded, _ = tokenize_and_pad(X_val, tokenizer=tokenizer, fit=False)
     X_test_padded, _ = tokenize_and_pad(X_test, tokenizer=tokenizer, fit=False)
+    
+    # Save validation split for external use
     val_df = pd.DataFrame({
-    'text': X_val,
-    'label': y_val
-})
-
-# Save to CSV
-val_df.to_csv('val.csv', index=False)
-print("Validation data saved as val.csv")
-
+        'text': X_val,
+        'label': y_val
+    })
+    val_df.to_csv('val.csv', index=False)
+    print("Validation data saved as val.csv")
+    
     vocab_size = len(tokenizer.word_index) + 1
     print(f"\n  ✓ Final vocabulary size: {vocab_size:,}")
     
