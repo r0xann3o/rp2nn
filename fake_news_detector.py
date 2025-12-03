@@ -190,19 +190,19 @@ def plot_training_history(history, name):
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     axes[0, 0].plot(history.history['accuracy'], label='Train Accuracy')
     axes[0, 0].plot(history.history['val_accuracy'], label='Val Accuracy')
-    axes[0, 0].set_title('Model Accuracy'); axes[0, 0].legend(); axes[0, 0].grid(True)
+    axes[0, 0].set_title(f'{name} Model Accuracy'); axes[0, 0].legend(); axes[0, 0].grid(True)
     
     axes[0, 1].plot(history.history['loss'], label='Train Loss')
     axes[0, 1].plot(history.history['val_loss'], label='Val Loss')
-    axes[0, 1].set_title('Model Loss'); axes[0, 1].legend(); axes[0, 1].grid(True)
+    axes[0, 1].set_title(f'{name} Model Loss'); axes[0, 1].legend(); axes[0, 1].grid(True)
     
     axes[1, 0].plot(history.history['precision'], label='Train Precision')
     axes[1, 0].plot(history.history['val_precision'], label='Val Precision')
-    axes[1, 0].set_title('Model Precision'); axes[1, 0].legend(); axes[1, 0].grid(True)
+    axes[1, 0].set_title(f'{name} Model Precision'); axes[1, 0].legend(); axes[1, 0].grid(True)
     
     axes[1, 1].plot(history.history['recall'], label='Train Recall')
     axes[1, 1].plot(history.history['val_recall'], label='Val Recall')
-    axes[1, 1].set_title('Model Recall'); axes[1, 1].legend(); axes[1, 1].grid(True)
+    axes[1, 1].set_title(f'{name} Model Recall'); axes[1, 1].legend(); axes[1, 1].grid(True)
     
     plt.tight_layout()
     plt.savefig(f'training_history_{name}.png', dpi=300, bbox_inches='tight')
