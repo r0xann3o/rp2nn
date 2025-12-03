@@ -6,7 +6,6 @@ This script implements a deep learning model to classify fake vs real news artic
 import pandas as pd
 import numpy as np
 import re
-import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
@@ -17,9 +16,6 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-import os
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -74,17 +70,21 @@ def load_data():
     print("STEP 1: Loading datasets...")
     print("="*60)
     
+    # Load fake news data
     fake_df = pd.read_csv('Fake.csv')
     fake_df['label'] = 0
     print(f"  ✓ Loaded {len(fake_df)} fake news articles")
     
+    # Load real news data
     true_df = pd.read_csv('True.csv')
     true_df['label'] = 1
     print(f"  ✓ Loaded {len(true_df)} real news articles")
     
+    # Concatenate fake and real news data AND SHUFFLE 
     df = pd.concat([fake_df, true_df], ignore_index=True)
     df = df.sample(frac=1, random_state=42).reset_index(drop=True)
     
+
     print(f"\nTotal samples: {len(df)}")
     print(f"  - Fake news: {len(df[df['label'] == 0])}")
     print(f"  - Real news: {len(df[df['label'] == 1])}")
@@ -94,23 +94,32 @@ def load_data():
 def preprocess_text(text):
     if pd.isna(text):
         return ""
+
+    # Preprocess text   
     text = str(text).lower()
+    # Remove URLs, email addresses, and non-alphanumeric characters
     text = re.sub(r'http\S+|www.\S+', '', text)
+    # Remove email addresses
     text = re.sub(r'\S+@\S+', '', text)
+    # Remove non-alphanumeric characters
     text = re.sub(r'[^a-zA-Z\s]', '', text)
+    # Remove extra whitespace
     text = re.sub(r'\s+', ' ', text).strip()
     return text
+
 
 def combine_title_text(row):
     title = preprocess_text(row.get('title', ''))
     text = preprocess_text(row.get('text', ''))
     return (title + ' ' + text).strip()
 
+
 def prepare_data(df):
     print("\n" + "="*60)
     print("STEP 2: Preprocessing text data...")
     print("="*60)
     
+
     df['combined_text'] = df.apply(combine_title_text, axis=1)
     initial_count = len(df)
     df = df[df['combined_text'].str.len() > 0]
@@ -124,6 +133,7 @@ def prepare_data(df):
     
     return texts, labels
 
+# Tokenize and pad sequences
 def tokenize_and_pad(texts, tokenizer=None, fit=True):
     if fit:
         print("\n" + "="*60)
@@ -176,7 +186,7 @@ def build_gru_model(vocab_size):
     return model
 
 # -------------------- PLOTTING -------------------- #
-def plot_training_history(history):
+def plot_training_history(history, name):
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     axes[0, 0].plot(history.history['accuracy'], label='Train Accuracy')
     axes[0, 0].plot(history.history['val_accuracy'], label='Val Accuracy')
@@ -195,9 +205,9 @@ def plot_training_history(history):
     axes[1, 1].set_title('Model Recall'); axes[1, 1].legend(); axes[1, 1].grid(True)
     
     plt.tight_layout()
-    plt.savefig('training_history.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'training_history_{name}.png', dpi=300, bbox_inches='tight')
     plt.close()
-    print("Training history plot saved as 'training_history.png'")
+    print(f"Training history plot saved as 'training_history_{name}.png'")
 
 def plot_confusion_matrix(y_true, y_pred, model_name):
     cm = confusion_matrix(y_true, y_pred)
@@ -243,8 +253,6 @@ def main():
         'text': X_val,
         'label': y_val
     })
-    val_df.to_csv('val.csv', index=False)
-    print("Validation data saved as val.csv")
     
     vocab_size = len(tokenizer.word_index) + 1
     print(f"\n  ✓ Final vocabulary size: {vocab_size:,}")
@@ -258,38 +266,48 @@ def main():
     lstm_model = build_lstm_model(vocab_size)
     lstm_model.summary()
     
-    early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True, verbose=1)
-    model_checkpoint = ModelCheckpoint('best_lstm_model.h5', monitor='val_loss', save_best_only=True, verbose=1)
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-5, verbose=1)
+    early_stopping_lstm = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True, verbose=1)
+    model_checkpoint_lstm = ModelCheckpoint('best_lstm_model.h5', monitor='val_loss', save_best_only=True, verbose=1)
+    reduce_lr_lstm = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-5, verbose=1)
     
-    history_lstm = lstm_model.fit(
-        X_train_padded, y_train,
-        batch_size=BATCH_SIZE, epochs=EPOCHS,
-        validation_data=(X_val_padded, y_val),
-        callbacks=[early_stopping, model_checkpoint, reduce_lr],
-        verbose=1
-    )
-    plot_training_history(history_lstm)
-    lstm_model.load_weights('best_lstm_model.h5')
-    evaluate_model(lstm_model, X_test_padded, y_test, 'LSTM')
+    try:
+        history_lstm = lstm_model.fit(
+            X_train_padded, y_train,
+            batch_size=BATCH_SIZE, epochs=EPOCHS,
+            validation_data=(X_val_padded, y_val),
+            callbacks=[early_stopping_lstm, model_checkpoint_lstm, reduce_lr_lstm],
+            verbose=1
+        )
+        plot_training_history(history_lstm, 'LSTM')
+        lstm_model.load_weights('best_lstm_model.h5')
+        evaluate_model(lstm_model, X_test_padded, y_test, 'LSTM')
+    except Exception as e:
+        print(f"❌ Error training LSTM model: {e}")
+        raise
     
     # -------------------- GRU -------------------- #
     print("\n" + "="*60 + "\nBuilding and Training GRU Model\n" + "="*60)
     gru_model = build_gru_model(vocab_size)
     gru_model.summary()
     
+    early_stopping_gru = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True, verbose=1)
     model_checkpoint_gru = ModelCheckpoint('best_gru_model.h5', monitor='val_loss', save_best_only=True, verbose=1)
+    reduce_lr_gru = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-5, verbose=1)
     
-    history_gru = gru_model.fit(
-        X_train_padded, y_train,
-        batch_size=BATCH_SIZE, epochs=EPOCHS,
-        validation_data=(X_val_padded, y_val),
-        callbacks=[early_stopping, model_checkpoint_gru, reduce_lr],
-        verbose=1
-    )
-    plot_training_history(history_gru)
-    gru_model.load_weights('best_gru_model.h5')
-    evaluate_model(gru_model, X_test_padded, y_test, 'GRU')
+    try:
+        history_gru = gru_model.fit(
+            X_train_padded, y_train,
+            batch_size=BATCH_SIZE, epochs=EPOCHS,
+            validation_data=(X_val_padded, y_val),
+            callbacks=[early_stopping_gru, model_checkpoint_gru, reduce_lr_gru],
+            verbose=1
+        )
+        plot_training_history(history_gru, 'GRU')
+        gru_model.load_weights('best_gru_model.h5')
+        evaluate_model(gru_model, X_test_padded, y_test, 'GRU')
+    except Exception as e:
+        print(f"❌ Error training GRU model: {e}")
+        raise
     
     # -------------------- SAVE FINAL MODELS -------------------- #
     print("\n" + "="*60 + "\nSaving final models\n" + "="*60)
@@ -297,7 +315,7 @@ def main():
     gru_model.save('gru_model_final.h5')
     print("Models saved: 'lstm_model_final.h5', 'gru_model_final.h5'")
     
-    print("\n🎉 Training Complete! 🎉\nGenerated files:\n  - best_lstm_model.h5\n  - best_gru_model.h5\n  - lstm_model_final.h5\n  - gru_model_final.h5\n  - training_history.png\n  - confusion_matrix_lstm.png\n  - confusion_matrix_gru.png")
+    print("\n🎉 Training Complete! 🎉\nGenerated files:\n  - best_lstm_model.h5\n  - best_gru_model.h5\n  - lstm_model_final.h5\n  - gru_model_final.h5\n  - training_history_LSTM.png\n  - training_history_GRU.png\n  - confusion_matrix_lstm.png\n  - confusion_matrix_gru.png")
 
 if __name__ == "__main__":
     main()
